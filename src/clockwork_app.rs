@@ -3,6 +3,8 @@ use super::App;
 use super::Clockwork;
 use super::ClockworkConfig;
 use crate::clockwork::ClockworkHandle;
+#[cfg(feature = "logging")]
+use crate::clockwork_logger::{ClockworkLogger, LoggerConfig};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::fs::File;
@@ -13,6 +15,9 @@ use std::path::PathBuf;
 pub struct ClockworkAppConfig<T> {
     #[serde(default)]
     pub(crate) clockwork: ClockworkConfig,
+    #[cfg(feature = "logging")]
+    #[serde(default)]
+    pub(crate) logger: LoggerConfig,
     pub(crate) app: T,
 }
 
@@ -23,6 +28,10 @@ pub struct ClockworkApp<T: App> {
 
 impl<T: App> ClockworkApp<T> {
     pub fn from_config(conf: ClockworkAppConfig<T::Config>) -> Self {
+        #[cfg(feature = "logging")]
+        {
+            ClockworkLogger::from(conf.logger).enable_logging();
+        }
         Self::new(Clockwork::from(conf.clockwork), T::from(conf.app))
     }
 
@@ -75,7 +84,7 @@ impl<T: App> ClockworkApp<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::clockwork_app::{App, ClockworkApp};
+    use crate::clockwork_app::ClockworkApp;
     use crate::{App, ClockworkHandle, Configurable, Runnable};
     use serde::Deserialize;
 
@@ -93,7 +102,7 @@ mod tests {
         impl Configurable for BasicApp {
             type Config = BasicAppConf;
 
-            fn from(app_conf: Self::AppConfig) -> Self {
+            fn from(app_conf: Self::Config) -> Self {
                 Self { val: app_conf.val }
             }
         }

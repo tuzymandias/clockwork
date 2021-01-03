@@ -6,13 +6,14 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-logging = [ "tracing" ]
+logging = [ "tracing", "tracing-subscriber", "tracing-appender" ]
 
 [dependencies]
 tokio = { version = "1.0.1", features=["full"] }
 toml = { version = "0.5.7" }
 serde = { version = "1.0", features = ["derive"] }
-tracing-subscriber = { version = "0.2.15", features = ["fmt"] }
+tracing-subscriber = { version = "0.2.15", features = ["fmt"], optional = true  }
+tracing-appender = { version = "0.1.2", optional = true }
 async-trait = { version = "0.1.42" }
 tracing = { version = "0.1.21", optional = true }
 
@@ -23,4 +24,5 @@ path = "src/lib.rs"
 [[example]]
 name = "basic_app"
 path = "examples/basic_app.rs"
+required-features = [ "logging" ]
 

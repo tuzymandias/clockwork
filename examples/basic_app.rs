@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use tokio::macros::support::{Future, Pin};
 use tokio::time::{sleep, Duration, Instant};
+use tracing::info;
 
 #[derive(Deserialize, Clone)]
 struct MultiEchoConfig {
@@ -41,7 +42,7 @@ impl Runnable for MultiEchoApp {
 
             handle.schedule_repeating_task_at(
                 move || {
-                    println!(
+                    info!(
                         "{}: {}",
                         conf.every_half_second,
                         count.fetch_add(1, Ordering::SeqCst)
@@ -58,7 +59,7 @@ impl Runnable for MultiEchoApp {
 
             handle.schedule_repeating_task_at(
                 move || {
-                    println!(
+                    info!(
                         "{}: {}",
                         conf.every_second,
                         count.fetch_add(1, Ordering::SeqCst)
@@ -71,7 +72,7 @@ impl Runnable for MultiEchoApp {
     }
 
     fn shutdown(&self) {
-        println!("MultiEchoApp shut down!");
+        info!("MultiEchoApp shut down!");
     }
 
     fn run<'a>(&'a self, handle: ClockworkHandle) -> Pin<Box<dyn Future<Output = ()> + Send>> {
@@ -89,6 +90,9 @@ fn main() {
         every_half_second = 'Hello'
         every_second = 'World'
         run_duration_secs = 10
+        
+        [logger]
+        write_target = 'STDOUT'
     "#
     .to_string();
 

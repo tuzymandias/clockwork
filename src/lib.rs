@@ -3,6 +3,9 @@ mod clockwork_app;
 mod clockwork_config;
 mod clockwork_thread;
 
+#[cfg(feature = "logging")]
+mod clockwork_logger;
+
 pub type Clockwork = clockwork::Clockwork;
 pub type ClockworkHandle = clockwork::ClockworkHandle;
 pub type ClockworkConfig = clockwork_config::ClockworkConfig;
