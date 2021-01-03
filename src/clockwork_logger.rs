@@ -13,6 +13,18 @@ const fn default_as_false() -> bool {
     false
 }
 
+/// Default log file if filename not specified
+/// For example, if your executable is called `stuff`, it will default to `stuff.log`
+pub(crate) fn default_as_exe() -> String {
+    let executable_path = std::env::current_exe().expect("Unable to find executable path");
+    let stem = executable_path.file_stem().unwrap();
+    let log_file = format!("{}.log", stem.to_string_lossy());
+    log_file
+}
+
+/// How log lines should be formatted.
+/// Defaults to FULL (the equivalent to `tracing_subscriber::fmt::format::Full`)
+/// Please see: https://docs.rs/tracing-subscriber/0.2.15/tracing_subscriber/fmt/index.html
 #[derive(Deserialize)]
 pub enum LoggerFormat {
     COMPACT,
@@ -27,14 +39,16 @@ impl Default for LoggerFormat {
     }
 }
 
+/// Maximum log level that should be logged
+/// Maps exactly to the `tracing_subscriber::filter::LevelFilter` enum
 #[derive(Deserialize, Copy, Clone)]
 pub enum LoggerLevel {
     OFF,
-    TRACE,
-    DEBUG,
-    INFO,
-    WARN,
     ERROR,
+    WARN,
+    INFO,
+    DEBUG,
+    TRACE,
 }
 
 impl Into<LevelFilter> for LoggerLevel {
@@ -56,11 +70,17 @@ impl Default for LoggerLevel {
     }
 }
 
+/// Target to write log lines to
+/// Default is to write to stdout
+/// Otherwise, if target is specified to write to a file, the file name defaults to `default_as_exe`
 #[derive(Deserialize)]
 #[serde(tag = "write_target")]
 pub enum WriteTarget {
     STDOUT,
-    FILE { file_name: String },
+    FILE {
+        #[serde(default = "default_as_exe")]
+        file_name: String,
+    },
 }
 
 impl Default for WriteTarget {
@@ -172,6 +192,3 @@ impl ClockworkLogger {
             .expect("Unable to set logger");
     }
 }
-
-#[cfg(test)]
-mod tests {}
