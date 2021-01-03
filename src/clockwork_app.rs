@@ -23,16 +23,27 @@ pub struct ClockworkAppConfig<T> {
 
 pub struct ClockworkApp<T: App> {
     cw: Clockwork,
+    #[cfg(feature = "logging")]
+    logger: Option<ClockworkLogger>,
     app: T,
 }
 
 impl<T: App> ClockworkApp<T> {
+    #[cfg(feature = "logging")]
     pub fn from_config(conf: ClockworkAppConfig<T::Config>) -> Self {
-        #[cfg(feature = "logging")]
-        {
-            ClockworkLogger::from(conf.logger).enable_logging();
+        Self {
+            cw: Clockwork::from(conf.clockwork),
+            logger: Some(ClockworkLogger::from(conf.logger)),
+            app: T::from(conf.app),
         }
-        Self::new(Clockwork::from(conf.clockwork), T::from(conf.app))
+    }
+
+    #[cfg(not(feature = "logging"))]
+    pub fn from_config(conf: ClockworkAppConfig<T::Config>) -> Self {
+        Self {
+            cw: Clockwork::from(conf.clockwork),
+            app: T::from(conf.app),
+        }
     }
 
     pub fn from_config_str(conf_string: String) -> Self
@@ -60,6 +71,11 @@ impl<T: App> ClockworkApp<T> {
     }
 
     pub fn start(&self) {
+        #[cfg(feature = "logging")]
+        if self.logger.is_some() {
+            self.logger.as_ref().unwrap().enable_logging();
+        }
+
         self.app.setup(self.cw.handle());
         self.cw.run(async { self.app.run(self.cw.handle()).await });
         self.app.shutdown();
@@ -69,8 +85,18 @@ impl<T: App> ClockworkApp<T> {
         self.cw.handle()
     }
 
+    #[cfg(not(feature = "logging"))]
     pub(crate) fn new(cw: Clockwork, app: T) -> Self {
         Self { cw, app }
+    }
+
+    #[cfg(feature = "logging")]
+    pub(crate) fn new(cw: Clockwork, app: T) -> Self {
+        Self {
+            cw,
+            logger: None,
+            app,
+        }
     }
 
     pub(crate) fn mut_app(&mut self) -> &mut T {

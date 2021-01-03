@@ -1,9 +1,8 @@
 use serde::Deserialize;
 use std::path::PathBuf;
 use tracing::Dispatch;
-use tracing_appender::non_blocking::WorkerGuard;
+use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_subscriber::filter::LevelFilter;
-use tracing_subscriber::fmt::writer::BoxMakeWriter;
 
 const fn default_as_true() -> bool {
     true
@@ -90,7 +89,7 @@ impl Default for WriteTarget {
 }
 
 impl WriteTarget {
-    pub(crate) fn writer(self) -> BoxMakeWriter {
+    pub(crate) fn writer(self) -> (NonBlocking, WorkerGuard) {
         let writer: Box<dyn std::io::Write + Send + Sync> = match self {
             WriteTarget::STDOUT => Box::new(std::io::stdout()),
             WriteTarget::FILE { file_name } => {
@@ -102,12 +101,7 @@ impl WriteTarget {
             }
         };
 
-        let (non_blocking, guard) = tracing_appender::non_blocking(writer);
-
-        static mut GUARD: Option<WorkerGuard> = None;
-        unsafe { GUARD = Some(guard) }
-
-        BoxMakeWriter::new(non_blocking)
+        tracing_appender::non_blocking(writer)
     }
 }
 
@@ -142,16 +136,19 @@ impl Default for LoggerConfig {
 
 pub struct ClockworkLogger {
     dispatch: Dispatch,
+    _writer: NonBlocking,
+    _guard: WorkerGuard,
 }
 
 impl From<LoggerConfig> for ClockworkLogger {
     fn from(conf: LoggerConfig) -> Self {
-        let writer = conf.write_target.writer();
+        let (writer, guard) = conf.write_target.writer();
+
         let builder = tracing_subscriber::fmt()
             .with_thread_names(conf.show_thread_names)
             .with_thread_ids(conf.show_thread_ids)
             .with_max_level(conf.log_level)
-            .with_writer(writer);
+            .with_writer(writer.clone());
 
         // FIXME: Surely this can be made more compact!
         let dispatch = match conf.log_format {
@@ -182,7 +179,11 @@ impl From<LoggerConfig> for ClockworkLogger {
             },
         };
 
-        Self { dispatch }
+        Self {
+            dispatch,
+            _writer: writer,
+            _guard: guard,
+        }
     }
 }
 

@@ -92,7 +92,7 @@ fn main() {
         run_duration_secs = 10
         
         [logger]
-        write_target = 'FILE'
+        write_target = 'STDOUT'
     "#
     .to_string();
 
