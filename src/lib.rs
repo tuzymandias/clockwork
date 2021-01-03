@@ -16,7 +16,7 @@ pub trait Runnable {
     fn setup(&self, handle: ClockworkHandle);
     fn shutdown(&self) {}
 
-    /// Infinitely yielding loop until 'stopped' flag is raised
+    /// Infinitely yielding loop until 'stopped' flag is raised. FIXME: there maybe a better solution
     fn run<'a>(
         &'a self,
         handle: ClockworkHandle,

@@ -129,7 +129,7 @@ impl From<ClockworkConfig> for Clockwork {
             builder.enable_time();
         }
 
-        builder.max_threads(conf.runtime.max_threads);
+        builder.max_blocking_threads(conf.runtime.max_threads);
 
         Self::new(ClockworkHandle::new(Arc::new(
             builder.build().expect("Failed to Build Runtime"),
