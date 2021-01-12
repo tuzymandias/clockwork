@@ -11,6 +11,8 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 
+/// A type that stores information required to configure a `ClockworkApp`
+/// `T` has to be a type that implements `Deserialize`
 #[derive(Deserialize)]
 pub struct ClockworkAppConfig<T> {
     #[serde(default)]
@@ -21,6 +23,9 @@ pub struct ClockworkAppConfig<T> {
     pub(crate) app: T,
 }
 
+/// An application using the `Clockwork` run time
+/// Maintains a `Clockwork` instance and the Logger (if `logging` feature is enabled)
+/// `T` has to be a type that implements `App`
 pub struct ClockworkApp<T: App> {
     cw: Clockwork,
     #[cfg(feature = "logging")]
@@ -29,8 +34,10 @@ pub struct ClockworkApp<T: App> {
 }
 
 impl<T: App> ClockworkApp<T> {
+    /// FIXME: There may be a more elegant way to write these two functions
+    /// Constructs a `ClockworkApp` instance from a `ClockworkAppConfig` with a logger
     #[cfg(feature = "logging")]
-    pub fn from_config(conf: ClockworkAppConfig<T::Config>) -> Self {
+    pub(crate) fn from_config(conf: ClockworkAppConfig<T::Config>) -> Self {
         Self {
             cw: Clockwork::from(conf.clockwork),
             logger: Some(ClockworkLogger::from(conf.logger)),
@@ -38,14 +45,36 @@ impl<T: App> ClockworkApp<T> {
         }
     }
 
+    /// Constructs a `ClockworkApp` instance from a `ClockworkAppConfig`
     #[cfg(not(feature = "logging"))]
-    pub fn from_config(conf: ClockworkAppConfig<T::Config>) -> Self {
+    pub(crate) fn from_config(conf: ClockworkAppConfig<T::Config>) -> Self {
         Self {
             cw: Clockwork::from(conf.clockwork),
             app: T::from(conf.app),
         }
     }
 
+    /// Constructs a `ClockworkApp` instance from a config String
+    /// ```
+    /// use clockwork::{ClockworkApp, Configurable, Runnable, ClockworkHandle};
+    /// use serde::Deserialize;
+    /// #[derive(Deserialize)]
+    /// struct TestConf{};
+    /// struct TestApp{};
+    /// impl Configurable for TestApp {
+    ///     type Config = TestConf;
+    ///
+    ///     fn from(config: Self::Config) -> Self {
+    ///         Self{}
+    ///     }
+    /// }
+    ///
+    /// impl Runnable for TestApp {
+    ///     fn setup(&self,handle: ClockworkHandle) {}
+    /// }
+    ///
+    /// let app: ClockworkApp<TestApp> = ClockworkApp::from_config_str("[app]".to_string());
+    /// ```
     pub fn from_config_str(conf_string: String) -> Self
     where
         T::Config: DeserializeOwned,
@@ -56,6 +85,29 @@ impl<T: App> ClockworkApp<T> {
         Self::from_config(conf)
     }
 
+    /// Constructs a `ClockworkApp` instance from a path to the config file
+    /// ```no_run
+    /// use clockwork::{ClockworkApp, Configurable, Runnable, ClockworkHandle};
+    /// use serde::Deserialize;
+    /// use std::path::PathBuf;
+    /// use std::str::FromStr;
+    /// #[derive(Deserialize)]
+    /// struct TestConf{};
+    /// struct TestApp{};
+    /// impl Configurable for TestApp {
+    ///     type Config = TestConf;
+    ///
+    ///     fn from(config: Self::Config) -> Self {
+    ///         Self{}
+    ///     }
+    /// }
+    ///
+    /// impl Runnable for TestApp {
+    ///     fn setup(&self,handle: ClockworkHandle) {}
+    /// }
+    ///
+    /// let app: ClockworkApp<TestApp> = ClockworkApp::from_path(PathBuf::from_str("").unwrap());
+    /// ```
     pub fn from_path<'a>(path: PathBuf) -> Self
     where
         T::Config: DeserializeOwned,
@@ -70,6 +122,8 @@ impl<T: App> ClockworkApp<T> {
         Self::from_config_str(contents)
     }
 
+    /// Starts the application, blocks on `Clockwork::run`
+    /// Enables the logger if `logging` feature is enabled
     pub fn start(&self) {
         #[cfg(feature = "logging")]
         if self.logger.is_some() {
@@ -77,10 +131,12 @@ impl<T: App> ClockworkApp<T> {
         }
 
         self.app.setup(self.cw.handle());
-        self.cw.run(async { self.app.run(self.cw.handle()).await });
+        self.cw.run(&self.app);
         self.app.shutdown();
     }
 
+    /// Exposes the application's `ClockworkHandle`
+    /// Allows other threads to stop the application
     pub fn handle(&self) -> ClockworkHandle {
         self.cw.handle()
     }

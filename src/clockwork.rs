@@ -1,4 +1,5 @@
 use super::ClockworkConfig;
+use crate::Runnable;
 use std::future::Future;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -25,14 +26,12 @@ impl ClockworkHandle {
 
     /// Schedules a task that repeats every interval starting from the specified time until
     /// runtime is stopped
-    pub fn schedule_repeating_task_at<F: 'static + Fn() + std::marker::Sync + std::marker::Send>(
-        &self,
-        f: F,
-        start: Instant,
-        period: Duration,
-    ) {
+    pub fn schedule_repeating_task_at<F>(&self, f: F, start: Instant, period: Duration)
+    where
+        F: 'static + Fn() + std::marker::Sync + std::marker::Send,
+    {
         let stopped = Arc::clone(&self.stopped);
-        self.rt.spawn(async move {
+        self.spawn_task(async move {
             let interval = interval_at(start, period);
             tokio::pin!(interval);
 
@@ -45,22 +44,29 @@ impl ClockworkHandle {
 
     /// Schedules a task that runs once after duration elapsed.
     /// If runtime is stopped before duration elapsed, the task may not be run.
-    pub fn schedule_oneof_task<F: 'static + Fn() + std::marker::Sync + std::marker::Send>(
-        &self,
-        f: F,
-        duration: Duration,
-    ) {
-        self.rt.spawn(async move {
+    pub fn schedule_oneof_task<F>(&self, f: F, duration: Duration)
+    where
+        F: 'static + Fn() + std::marker::Sync + std::marker::Send,
+    {
+        self.spawn_task(async move {
             sleep(duration).await;
             f();
         });
     }
 
-    /// Raise the 'stopped' flag, triggers shutdown sequence on the next spin 'tick'
+    /// Spawns a future
+    pub fn spawn_task<F>(&self, future: F)
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        self.rt.spawn(future);
+    }
+
+    /// Raise the 'stopped' flag
     pub fn stop(&self) {
         self.stopped.store(true, Ordering::SeqCst);
     }
-
     pub fn stopped(&self) -> bool {
         self.stopped.load(Ordering::Relaxed)
     }
@@ -83,28 +89,34 @@ impl Clockwork {
 
     /// Schedules a task that repeats every interval starting from the specified time until
     /// runtime is stopped
-    pub fn schedule_repeating_task_at<F: 'static + Fn() + std::marker::Sync + std::marker::Send>(
-        &self,
-        f: F,
-        start: Instant,
-        period: Duration,
-    ) {
+    pub fn schedule_repeating_task_at<F>(&self, f: F, start: Instant, period: Duration)
+    where
+        F: 'static + Fn() + std::marker::Sync + std::marker::Send,
+    {
         self.handle().schedule_repeating_task_at(f, start, period)
     }
 
     /// Schedules a task that runs once after duration elapsed.
     /// If runtime is stopped before duration elapsed, the task may not be run.
-    pub fn schedule_oneof_task<F: 'static + Fn() + std::marker::Sync + std::marker::Send>(
-        &self,
-        f: F,
-        duration: Duration,
-    ) {
+    pub fn schedule_oneof_task<F>(&self, f: F, duration: Duration)
+    where
+        F: 'static + Fn() + std::marker::Sync + std::marker::Send,
+    {
         self.handle().schedule_oneof_task(f, duration)
     }
 
+    /// Spawns a future
+    pub fn spawn_task<F>(&self, future: F)
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        self.handle().spawn_task(future);
+    }
+
     /// Runs a future on the runtime, blocking until completion
-    pub fn run<F: Future>(&self, f: F) {
-        self.handle.run(f);
+    pub fn run<F: Runnable>(&self, f: &F) {
+        self.handle.run(f.run(self.handle()));
     }
 
     /// Returns a clone of the ClockworkHandle (allows scheduling from different thread, etc)

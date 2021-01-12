@@ -14,7 +14,7 @@ const fn default_as_false() -> bool {
 
 /// Default log file if filename not specified
 /// For example, if your executable is called `stuff`, it will default to `stuff.log`
-pub(crate) fn default_as_exe() -> String {
+fn default_as_exe() -> String {
     let executable_path = std::env::current_exe().expect("Unable to find executable path");
     let stem = executable_path.file_stem().unwrap();
     let log_file = format!("{}.log", stem.to_string_lossy());
@@ -105,6 +105,13 @@ impl WriteTarget {
     }
 }
 
+/// Logger configurations
+/// show_time - enables/disables timestamping in log output
+/// show_thread_names - enables/disables thread names in log output
+/// show_thread_ids - enables/disables thread id in log output
+/// log_format - log formatting (COMPACT/PRETTY/JSON/FULL)
+/// log_level - maximum log verbosity level (OFF/ERROR/WARN/INFO/DEBUG/TRACE)
+/// write_target - target to write log into (see `WriteTarget` struct)
 #[derive(Deserialize)]
 pub struct LoggerConfig {
     #[serde(default = "default_as_true")]
@@ -121,6 +128,9 @@ pub struct LoggerConfig {
     pub(crate) write_target: WriteTarget,
 }
 
+/// Even if all the fields have default value, it won't be automatically deserialized
+/// if it is used in another struct.
+/// See the following serde issue: https://github.com/serde-rs/serde/issues/1416
 impl Default for LoggerConfig {
     fn default() -> Self {
         LoggerConfig {
@@ -134,7 +144,7 @@ impl Default for LoggerConfig {
     }
 }
 
-pub struct ClockworkLogger {
+pub(crate) struct ClockworkLogger {
     dispatch: Dispatch,
     _writer: NonBlocking,
     _guard: WorkerGuard,
@@ -188,7 +198,7 @@ impl From<LoggerConfig> for ClockworkLogger {
 }
 
 impl ClockworkLogger {
-    pub fn enable_logging(&self) {
+    pub(crate) fn enable_logging(&self) {
         tracing::dispatcher::set_global_default(self.dispatch.clone())
             .expect("Unable to set logger");
     }
