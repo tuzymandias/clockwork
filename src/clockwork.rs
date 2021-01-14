@@ -42,6 +42,14 @@ impl ClockworkHandle {
         });
     }
 
+    /// Schedules a task that repeats every interval until runtime is stopped
+    pub fn schedule_repeating_task<F>(&self, f: F, period: Duration)
+    where
+        F: 'static + Fn() + std::marker::Sync + std::marker::Send,
+    {
+        self.schedule_repeating_task_at(f, Instant::now(), period);
+    }
+
     /// Schedules a task that runs once after duration elapsed.
     /// If runtime is stopped before duration elapsed, the task may not be run.
     pub fn schedule_oneof_task<F>(&self, f: F, duration: Duration)
@@ -94,6 +102,14 @@ impl Clockwork {
         F: 'static + Fn() + std::marker::Sync + std::marker::Send,
     {
         self.handle().schedule_repeating_task_at(f, start, period)
+    }
+
+    /// Schedules a task that repeats every interval until runtime is stopped
+    pub fn schedule_repeating_task<F>(&self, f: F, period: Duration)
+    where
+        F: 'static + Fn() + std::marker::Sync + std::marker::Send,
+    {
+        self.handle().schedule_repeating_task(f, period)
     }
 
     /// Schedules a task that runs once after duration elapsed.
